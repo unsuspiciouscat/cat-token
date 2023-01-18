@@ -1,0 +1,73 @@
+#This is a guide on how to setup website - on nginx.
+#DO NOT RUN THIS DIRECTLY AS A BASH SCRIPT!
+#Get everything ready, randomly does an upgrade, out of bordom
+
+apt-get update
+apt-get upgrade
+apt-get install nginx
+
+cd /var/www/
+git clone https://github.com/unsuspiciouscat/cat-token.git
+mv cat-token thecattoken.com
+
+cd thecattoken.com
+
+#didn't relize why those bots were scraping git, until I downloaded it in my computer, LOL.
+rm -r .git
+rm initialize
+
+#Remember to add certbot, for Let's Encrypt
+#REDIRECT ALL TRAFFIC FROM WWW TO NON-WWW.
+#CNAME COULD WORK, BUT IT'S NOT THE BEST OPTION OUT THERE.
+#IF IN DOUBT, REFER TO
+#https://www.digitalocean.com/community/tutorials/how-to-redirect-www-to-non-www-with-nginx-on-centos-7
+#https://webdock.io/en/docs/how-guides/shared-hosting-multiple-websites/how-configure-nginx-to-serve-multiple-websites-single-vps
+
+nano /etc/nginx/conf.d/redirect.conf
+
+server {
+    server_name www.thecattoken.com;
+    return 301 $scheme://thecattoken.com$request_uri;
+}
+
+#COPY PASTE THIS INTO /etc/nginx/sites-available
+
+cd /etc/nginx/sites-available
+nano thecattoken.com
+
+    server {
+        index index.html;
+        server_name thecattoken.com;
+        root /var/www/thecattoken.com/;
+        access_log /var/log/nginx/access.log;
+        
+        #Randoms without logging
+        location = /favicon.ico { log_not_found off; access_log off; }
+        location = /robots.txt { log_not_found off; access_log off; allow all; }
+        
+        location ~* \.(css|gif|ico|jpeg|jpg|js|png)$ {
+           expires max;
+           log_not_found off;
+        }
+        
+        location /webmail/ {
+        alias /var/www/webmail/;
+        autoindex off;
+        index index.php;
+
+        location ~ \.php$ {
+          fastcgi_split_path_info ^(.+\.php)(/.+)$;
+          include       /etc/nginx/fastcgi_params;
+          fastcgi_pass  unix:/var/run/php/php7.4-fpm.sock;
+          fastcgi_index index.php;
+          fastcgi_param SCRIPT_FILENAME $request_filename;
+        }
+    }
+  
+        error_page 404 /custom_404.html;
+        }
+
+ln -s /etc/nginx/sites-available/thecattoken.com /etc/nginx/sites-enabled/thecattoken.com
+
+#This should not throw an error
+sudo systemctl restart nginx
